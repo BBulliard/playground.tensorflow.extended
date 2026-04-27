@@ -844,6 +844,14 @@ g.train circle {
   line-height: 1.7em;
 }
 
+.output-class-label { 
+  cursor: pointer; 
+}
+
+.output-class-label:hover tspan {
+  text-decoration: underline; fill: #0877bd; 
+}
+
 /* Article */
 
 article {
@@ -1106,4 +1114,94 @@ footer .links a:hover {
  
 .accuracy-row:first-child .accuracy-value {
   color: #000;
+}
+
+/** Confusion matrix **/
+.confusion-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: #555;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.confusion-subtitle {
+  font-size: 11px;
+  font-weight: 300;
+  color: #999;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+#confusion-matrix {
+  display: inline-block;
+}
+.cm-table {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 12px;
+}
+.cm-table th {
+  font-weight: 300;
+  color: #666;
+  text-align: center;
+  padding: 2px 4px;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-table th.cm-axis-label {
+  font-size: 11px;
+  color: #999;
+  font-style: italic;
+}
+.cm-table td.cm-row-label {
+  font-weight: 300;
+  color: #666;
+  text-align: right;
+  padding-right: 5px;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.cm-cell {
+  width: 46px;
+  height: 36px;
+  text-align: center;
+  vertical-align: middle;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #333;
+  transition: background 0.4s ease;
+  cursor: default;
+}
+.cm-cell.cm-diagonal {
+  font-weight: 500;
+}
+.cm-cell span {
+  display: block;
+  font-size: 9px;
+  font-weight: 300;
+  color: rgba(0,0,0,0.45);
+  margin-top: 1px;
+}
+
+/* output label */
+.output-label-editor {
+  position: fixed;
+  width: 90px;
+  font-size: 11px;
+  font-family: Helvetica, Arial, sans-serif;
+  border: 1px solid #0877bd;
+  border-radius: 3px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  outline: none;
+  background: white;
+  z-index: 9999;
 }

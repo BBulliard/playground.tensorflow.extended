@@ -200,6 +200,12 @@ function constructInput(example: ExampleND): number[] {
 }
 function constructInputIds(): string[] { return Object.keys(INPUTS); }
 
+function getDisplayLabel(i: number): string {
+  return (state.customClassLabels[i] && state.customClassLabels[i].trim() !== "")
+    ? state.customClassLabels[i]
+    : (state.classLabels[i] ?? String(i));
+}
+
 // ---------------------------------------------------------------------------
 // GUI
 // ---------------------------------------------------------------------------
@@ -211,12 +217,27 @@ function makeGUI() {
 
     if (modeSelected !== "csv") {
       state.numClasses = 1;     
-      state.csvData = null;       
-      state.activeInputs = [];  
+      //state.csvData = null;       
+      //state.activeInputs = []; 
+      //state.selectedInputs = []; 
       rebuildInputsFromState();
+    }else{
+      if (state.csvRawText) {
+        const isRegression = state.problem === Problem.REGRESSION;
+        const { examples, featureNames, classLabels, numClasses } = parseCSV(
+          state.csvRawText, state.csvLabelColumn ?? undefined, isRegression
+        );
+        state.csvData = examples;
+        state.numClasses = numClasses;
+        state.classLabels = classLabels;
+        setNDInputs(featureNames);
+      }
+      generateData();
     } 
+    updateOutputPanel();
     reset();
   });
+
   d3.select("#mode-select").property("value", state.isCSVDataset ? "csv" : "2d");
 
   //------- csv uploader -----------------------------------------------------
@@ -425,15 +446,14 @@ function makeGUI() {
 // Heatmap / ND panel switching
 // ---------------------------------------------------------------------------
 function updateOutputPanel(): void {
-  const isND = state.isCSVDataset;
-  d3.select("#heatmap").style("display", isND ? "none" : "block");
-  d3.select("#heatmap-output-info").style("display", isND ? "none" : "block");
-  d3.selectAll(".ui-noise,.ui-dataset,.basic-button").style("display", isND ? "none" : "block");
-  d3.select("#csv-label-selector").style("display", isND ? "block" : "none");
+  d3.select("#heatmap").style("display", state.isCSVDataset ? "none" : "block");
+  d3.select("#heatmap-output-info").style("display", state.isCSVDataset ? "none" : "block");
+  d3.selectAll(".ui-noise,.ui-dataset,.basic-button").style("display", state.isCSVDataset ? "none" : "block");
+  d3.select("#csv-label-selector").style("display", state.isCSVDataset ? "block" : "none");
 
-  const showAcc = isND && state.problem === Problem.CLASSIFICATION;
+  const showAcc = state.isCSVDataset && state.problem === Problem.CLASSIFICATION;
   d3.select("#accuracy-panel").style("display", showAcc ? "block" : "none");
-  d3.select("#confusion-matrix-button").style("display", showAcc ? "block" : "none");
+  d3.select("#confusion-matrix-panel").style("display", showAcc ? "block" : "none");
 }
 
 // ---------------------------------------------------------------------------
@@ -571,13 +591,51 @@ function drawNode(
       }
       if (isOutput) {
         const outputIndex = network[network.length - 1].findIndex(n => n.id === nodeId);
-        const label = state.classLabels[outputIndex];
-        const text = nodeGroup
+        const labelText = nodeGroup
           .append("text")
-          .attr("class", "main-label")
-          .attr("x", RECT_SIZE+10+(label.length*4)).attr("y", RECT_SIZE / 2)
-          .attr("text-anchor", "end");
-        text.append("tspan").text(label);
+          .attr("class", "main-label output-class-label")
+          .attr("x", RECT_SIZE + 10).attr("y", RECT_SIZE / 2)
+          .attr("text-anchor", "start")
+          .style("cursor", "pointer")
+          .style("dominant-baseline", "middle");
+        labelText.append("tspan").text(getDisplayLabel(outputIndex));
+        labelText.append("title").text("Click to rename this class");
+
+        labelText.on("click", function(event: MouseEvent) {
+          event.stopPropagation();
+
+          const textNode = labelText.node() as SVGTextElement;
+          const rect = textNode.getBoundingClientRect();
+
+          const inp = document.createElement("input");
+          inp.type = "text";
+          inp.value = (state.customClassLabels[outputIndex] !== "")
+            ? state.customClassLabels[outputIndex]
+            : (state.classLabels[outputIndex] ?? String(outputIndex));
+
+          inp.className = "output-label-editor";
+          inp.style.left   = rect.left + "px";
+          inp.style.top    = rect.top  + "px";
+          inp.style.height = Math.max(rect.height, 18) + "px";
+
+          document.body.appendChild(inp);
+          inp.focus();
+          inp.select();
+
+          function commit() {
+            const newVal = inp.value.trim();
+            state.customClassLabels[outputIndex] = newVal;
+            labelText.select("tspan")
+              .text(newVal !== "" ? newVal : (state.classLabels[outputIndex] ?? String(outputIndex)));
+            inp.remove();
+          }
+
+          inp.addEventListener("blur", commit);
+          inp.addEventListener("keydown", (e: KeyboardEvent) => {
+            if (e.key === "Enter")  { commit(); }
+            if (e.key === "Escape") { inp.remove(); }
+          });
+        });    
       }
     } else {
       // 4b. clic sur le groupe SVG pour activer/désactiver un input CSV
@@ -596,7 +654,6 @@ function drawNode(
         });
     }
     return;
-
   } else { // 5. mode 2D clickable canvas and mini-heatmap
     if (isOutput) return;
     // 5a. canvas pour tous les nœuds 2D non-output
@@ -1096,6 +1153,7 @@ function drawConfusionMatrix(data: ExampleND[]): void {
 function reset(onStartup = false) {
   lineChart.reset();
   state.serialize();
+
   if (!onStartup) userHasInteracted();
   player.pause();
   selectedNodeId = null;
@@ -1108,10 +1166,13 @@ function reset(onStartup = false) {
   const outputActivation = (state.problem === Problem.REGRESSION) 
     ? nn.Activations.LINEAR  
     : (state.numClasses > 1 ? nn.Activations.SOFTMAX : nn.Activations.TANH);
+
   network = nn.buildNetwork(shape, state.activation, outputActivation,
     state.regularization, constructInputIds(), state.initZero);
+
   lossTrain = getLoss(network, trainData);
   lossTest  = getLoss(network, testData);
+
   drawNetwork(network);
   updateOutputPanel();
   updateUI(true);
@@ -1193,7 +1254,12 @@ function hideControls() {
 // Data generation
 // ---------------------------------------------------------------------------
 function generateData(firstTime = false) {
-  if (!firstTime) { state.seed = Math.random().toFixed(5); state.serialize(); userHasInteracted(); }
+  if (!firstTime) {
+    state.seed = Math.random().toFixed(5); 
+    state.serialize(); 
+    userHasInteracted(); 
+  }
+
   Math.seedrandom(state.seed);
   let allData: ExampleND[];
   if (state.isCSVDataset && state.csvData != null) {
@@ -1287,6 +1353,7 @@ function buildLabelSelector(): void {
     state.csvData = examples;
     state.numClasses = numClasses;
     state.classLabels = discretizedClassLabels;
+    state.customClassLabels = new Array(numClasses).fill("");
     setNDInputs(featureNames);
     buildLabelSelector();   
     generateData();
@@ -1326,6 +1393,8 @@ function handleCSVFile(file: File): void {
       // 5. construct ui
       setNDInputs(featureNames);
       buildLabelSelector();
+      d3.selectAll(".ui-modeSelect").style("display","block");
+      d3.select("#mode-select").property("value", "csv")
       d3.select("#csv-label-selector").style("display", "block");
       generateData();
       parametersChanged = true;

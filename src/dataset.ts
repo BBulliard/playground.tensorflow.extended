@@ -170,7 +170,6 @@ export function classifySpiralData(numSamples: number, noise: number): ExampleND
   return points;
 }
 
-/** Added 21.10.2025 */
 export function classifySimpleData(numSamples: number, noise: number): ExampleND[] {
   const points: ExampleND[] = [];
   const length = 5;
