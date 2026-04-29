@@ -453,7 +453,7 @@ function updateOutputPanel(): void {
 
   const showAcc = state.isCSVDataset && state.problem === Problem.CLASSIFICATION;
   d3.select("#accuracy-panel").style("display", showAcc ? "block" : "none");
-  d3.select("#confusion-matrix-panel").style("display", showAcc ? "block" : "none");
+  d3.select("#confusion-matrix-button").style("display", showAcc ? "block" : "none");
 }
 
 // ---------------------------------------------------------------------------
