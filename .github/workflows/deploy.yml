@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -23,9 +24,9 @@ jobs:
           mkdir -p dist
           cp analytics.js dist/
           cp index.html dist/
-          npx concat node_modules/material-design-lite/material.min.js node_modules/seedrandom/seedrandom.min.js > dist/lib.js
-          npx concat node_modules/material-design-lite/material.min.css styles.css > dist/bundle.css
-          npx browserify playground.ts -p [tsify] --global-transform [ babelify --presets [ @babel/preset-env ] ] | npx terser --compress > dist/bundle.js
+          cat node_modules/material-design-lite/material.min.js node_modules/seedrandom/seedrandom.min.js > dist/lib.js
+          cat node_modules/material-design-lite/material.min.css styles.css > dist/bundle.css
+          npx browserify playground.ts -p tsify --global-transform [ babelify --presets [ @babel/preset-env ] ] | npx terser --compress > dist/bundle.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
