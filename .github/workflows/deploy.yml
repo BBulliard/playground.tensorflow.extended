@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -26,12 +28,8 @@ jobs:
           cp index.html dist/
           cat node_modules/material-design-lite/material.min.js node_modules/seedrandom/seedrandom.min.js > dist/lib.js
           cat node_modules/material-design-lite/material.min.css styles.css > dist/bundle.css
-<<<<<<< Updated upstream
-          node node_modules/browserify/bin/cmd.js playground.ts -p tsify --global-transform [ babelify --presets [ @babel/preset-env ] ] | node node_modules/terser/bin/terser --compress > dist/bundle.js
-=======
           node node_modules/browserify/bin/cmd.js playground.ts -p tsify --global-transform [ babelify --presets [ @babel/preset-env ] ] > dist/bundle.js
           ls -la dist/
->>>>>>> Stashed changes
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
