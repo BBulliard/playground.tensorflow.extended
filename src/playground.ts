@@ -21,7 +21,7 @@ import {
 } from "./state";
 import {ExampleND, shuffle, parseCSV,
         makeHyperplaneClassifier, makeHypersphereClassifier,
-        toOneHot, discretizeLabels } from "./dataset";
+        toOneHot, discretizeLabels, ColumnEncoding } from "./dataset";
 import {AppendingLineChart} from "./linechart";
 import * as d3 from 'd3';
 
@@ -1329,6 +1329,7 @@ function buildLabelSelector(): void {
     let numClasses = parsed.numClasses;
     const featureNames = parsed.featureNames;
     const classLabels = parsed.classLabels;
+    showColumnEncodingInfo(parsed.columnEncodings); 
     let bins = 0;
 
     let discretizedClassLabels = classLabels;
@@ -1364,6 +1365,21 @@ function buildLabelSelector(): void {
 // ---------------------------------------------------------------------------
 // File Handler
 // ---------------------------------------------------------------------------
+function showColumnEncodingInfo(encodings: ColumnEncoding[]): void {
+  let container = document.getElementById('csv-encoding-info')!;
+  container.style.display = encodings.length === 0 ? 'none' : 'block';
+  if (encodings.length === 0) { container.style.display = 'none'; return; }
+  const rows = encodings.map(enc => {
+    const pairs = enc.values.map((v, i) => `<span style="color:#e8a838">"${v}"</span>→${i}`).join(', ');
+    return `<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,.08)">` +
+           `<b style="color:#9fcff5">${enc.columnName}</b>: ${pairs}</div>`;
+  }).join('');
+  container.innerHTML =
+    `<div style="padding:4px 0;font-weight:bold;color:#aaa">` +
+    `📝 Text columns auto-encoded (alphabetical order)</div>` + rows;
+  container.style.display = 'block';
+}
+
 function handleCSVFile(file: File): void {
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -1382,7 +1398,7 @@ function handleCSVFile(file: File): void {
       }
 
       // 3. parse label
-      const { examples, featureNames, classLabels, numClasses } = parseCSV(text, state.csvLabelColumn, isRegression);
+      const { examples, featureNames, classLabels, numClasses, columnEncodings } = parseCSV(text, state.csvLabelColumn, isRegression);
 
       // 4. update state
       state.csvData = examples;
@@ -1400,12 +1416,20 @@ function handleCSVFile(file: File): void {
       parametersChanged = true;
       reset();
 
+      const encodingLines = columnEncodings.map(enc =>
+        `  • ${enc.columnName}: ${enc.values.map((v, i) => `"${v}"→${i}`).join(', ')}`
+      );
+      const encodingNote = encodingLines.length > 0
+        ? `<br><span style="font-size:10px;color:#e8a838" title="${encodingLines.join('&#10;')}">` +
+          `⚠ ${encodingLines.length} text column${encodingLines.length > 1 ? 's' : ''} encoded` +
+          `</span>`
+        : '';
+ 
       d3.select("#drop-zone-text")
-      .html(`📄 ${file.name} <br> (${examples.length} rows, <br> ${featureNames.length} features)`);
+      .html(`📄 ${file.name} <br> (${examples.length} rows, <br> ${featureNames.length} features)${encodingNote}`);
 
-      if(!state.csvLabelColumn || !allColumns.includes(state.csvLabelColumn)) {
-        state.csvLabelColumn = allColumns[allColumns.length-1];
-      }
+      showColumnEncodingInfo(columnEncodings);
+
     } catch (err) {
       alert(`CSV parsing error: ${(err as Error).message}`);
     }

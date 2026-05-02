@@ -1205,3 +1205,10 @@ footer .links a:hover {
   background: white;
   z-index: 9999;
 }
+
+#csv-encoding-info{
+  margin-top:6px;
+  font-size:11px;
+  color:#ccc;
+  overflow-y:auto;
+}

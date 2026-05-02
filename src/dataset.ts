@@ -361,11 +361,19 @@ export function makeHypersphereClassifier(dim: number): DataGenerator {
  *
  * @returns { examples, featureNames } so callers can update INPUTS dynamically.
  */
+export type ColumnEncoding = {
+  columnName: string;
+  values: string [];
+  map: Map<string, Number>;
+}
+
+
 export function parseCSV(
   csvText: string,
   labelCol?: string,
   isRegression = false,
-): { examples: ExampleND[]; rawExamples: ExampleND[]; featureNames: string[]; classLabels: string[], numClasses: number } {
+): { examples: ExampleND[]; rawExamples: ExampleND[]; featureNames: string[];
+     classLabels: string[]; numClasses: number; columnEncodings: ColumnEncoding[]; } {
   const lines = csvText.trim().split(/\r?\n/);
   if (lines.length < 2) {
     throw new Error('CSV must have at least a header row and one data row.');
@@ -373,6 +381,7 @@ export function parseCSV(
 
   // Parse header
   const header = splitCSVLine(lines[0]);
+  const numCols = header.length;
 
   // Determine label column index
   let labelIdx: number;
@@ -396,28 +405,78 @@ export function parseCSV(
 
   const examples: ExampleND[] = [];
 
+  //first pass: check all unique values
+  const colRaw: string[][] = Array.from({ length: numCols }, () => []);
+  const dataRows: string[][] = [];
   for (let r = 1; r < lines.length; r++) {
     const line = lines[r].trim();
+    if (!line) continue;
     const cells = splitCSVLine(line);
-    const rawValues = cells.map(c => parseFloat(c.trim()));
-    const features = featureIndices.map(i => rawValues[i]);
-    const rawLabel = rawValues[labelIdx];
-    const label = rawLabel;
+    dataRows.push(cells);
+    for (let c = 0; c < numCols; c++) colRaw[c].push(cells[c].trim());
+  }
 
-    examples.push({ features, label, featureNames });
+  const colIsText: boolean[] = colRaw.map(vals =>
+    vals.some(v => v !== '' && isNaN(Number(v)))
+  );
+
+  const colEncoding: (Map<string, number> | null)[] = colRaw.map((vals, c) => {
+    if (!colIsText[c]) return null;
+    const unique = Array.from(new Set(vals.filter(v => v !== ''))).sort();
+    return new Map(unique.map((v, i) => [v, i]));
+  });
+
+  const labelClassNames: string[] | null =
+    colIsText[labelIdx] && colEncoding[labelIdx]
+      ? Array.from(colEncoding[labelIdx]!.entries()).sort((a, b) => a[1] - b[1]).map(([v]) => v)
+      : null;
+
+  for (const cells of dataRows) {
+    let valid = true;
+    const rowValues: number[] = [];
+    for (let c = 0; c < numCols; c++) {
+      const raw = (cells[c] ?? '').trim();
+      let val: number;
+      if (colIsText[c]) {
+        const enc = colEncoding[c]!.get(raw);
+        if (enc === undefined) { valid = false; break; }
+        val = enc;
+      } else {
+        val = Number(raw);
+        if (isNaN(val)) { valid = false; break; }
+      }
+      rowValues.push(val);
+    }
+    if (!valid || rowValues.length !== numCols) continue;
+    const features = featureIndices.map(i => rowValues[i]);
+    examples.push({ features, label: rowValues[labelIdx], featureNames });
   }
 
   if (examples.length === 0) {
     throw new Error('CSV contained no valid numeric rows after parsing.');
   }
 
-  const classLabels = [...new Set(examples.map(e => String(e.label)))].sort();
-  const labelToIndex = new Map(classLabels.map((l, i) => [l, i]));
-  const remapped = examples.map(e => ({
-    ...e,
-    label: labelToIndex.get(String(e.label))!
-  }));
-return { examples: remapped, rawExamples: examples, featureNames, classLabels, numClasses: classLabels.length };
+  let classLabels: string[];
+  let remapped: ExampleND[];
+ 
+  if (labelClassNames) {
+    classLabels = labelClassNames;
+    remapped = examples; 
+  } else {
+    classLabels = Array.from(new Set(examples.map(e => String(e.label)))).sort((a, b) => Number(a) - Number(b));
+    remapped = examples.map(e => ({ ...e, label: classLabels.indexOf(String(e.label)) }));
+  }
+
+  const columnEncodings: ColumnEncoding[] = header
+    .map((name, c) => {
+      if (!colIsText[c] || !colEncoding[c]) return null;
+      const values = Array.from(colEncoding[c]!.entries()).sort((a, b) => a[1] - b[1]).map(([v]) => v);
+      return { columnName: name, values, map: colEncoding[c]! } as ColumnEncoding;
+    })
+    .filter((e): e is ColumnEncoding => e !== null);
+
+  return { examples: remapped, rawExamples: examples, featureNames,
+           classLabels, numClasses: classLabels.length, columnEncodings};
 }
 
 /** Minimal CSV line splitter (handles quoted fields with commas). */
