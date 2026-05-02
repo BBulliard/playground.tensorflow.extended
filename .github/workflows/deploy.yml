@@ -15,10 +15,17 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install & Build
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
         run: |
-          npm install
-          npm run build
+          mkdir -p dist
+          cp analytics.js dist/
+          node_modules/.bin/concat node_modules/material-design-lite/material.min.js node_modules/seedrandom/seedrandom.min.js > dist/lib.js
+          node_modules/.bin/browserify playground.ts -p [tsify] --global-transform [ babelify --presets [ @babel/preset-env ] ] | node_modules/.bin/terser --compress > dist/bundle.js
+          node_modules/.bin/concat node_modules/material-design-lite/material.min.css styles.css > dist/bundle.css
+          cp index.html dist/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
