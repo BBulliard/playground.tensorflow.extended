@@ -19,7 +19,9 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npm install --no-save typescript@5
 
       - name: Build
         run: |
@@ -29,6 +31,7 @@ jobs:
           cat node_modules/material-design-lite/material.min.js node_modules/seedrandom/seedrandom.min.js > dist/lib.js
           cat node_modules/material-design-lite/material.min.css styles.css > dist/bundle.css
           node node_modules/browserify/bin/cmd.js src/playground.ts --basedir $(pwd) -p tsify --global-transform [ babelify --presets [ @babel/preset-env ] ] > dist/bundle.js
+          wc -c dist/bundle.js
           ls -la dist/
 
       - name: Deploy to GitHub Pages
