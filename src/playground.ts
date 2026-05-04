@@ -1056,7 +1056,7 @@ function computeConfusionMatrix(data: ExampleND[]): number[][] {
 
 function drawConfusionMatrix(data: ExampleND[]): void {
   const matrix = computeConfusionMatrix(data);
-  const labels = state.classLabels; 
+  const labels = state.classLabels.map((_, i) => getDisplayLabel(i)); 
   const n = state.numClasses;
   const cellSize = 48;
   const margin = { top: 60, left: 70, right: 10, bottom: 10 };
